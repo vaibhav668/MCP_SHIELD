@@ -1,0 +1,12 @@
+# Policy used by the unit tests. Same as shield/policy.yaml but low = 0.2, so ordinary test items
+# are decided by the regex rules and the tests never call the LLM judge.
+low: 0.2
+high: 0.8
+approval_timeout: 60
+trusted_domains:
+  - company.com
+on_block:
+  description: BLOCK
+  arguments: SANITIZE
+  result: SANITIZE
+on_unsure: ASK_HUMAN

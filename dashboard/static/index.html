@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MCP Shield</title>
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 4.5 5.4v5.8c0 4.6 3.1 8.6 7.5 10.3 4.4-1.7 7.5-5.7 7.5-10.3V5.4L12 2.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m8.8 12 2.2 2.2 4.3-4.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div>
+        <div class="brand-name">MCP Shield</div>
+        <div class="brand-sub">Runtime security for MCP agents</div>
+      </div>
+    </div>
+    <nav>
+      <div class="nav-label">Monitor</div>
+      <a href="#flow" data-view="flow">Live flow</a>
+      <a href="#overview" data-view="overview">Overview</a>
+      <a href="#activity" data-view="activity">Audit log</a>
+      <a href="#approvals" data-view="approvals">Approvals <span class="badge" id="approval-badge" hidden></span></a>
+      <div class="nav-label">Test</div>
+      <a href="#playground" data-view="playground">Playground</a>
+      <a href="#evaluation" data-view="evaluation">Evaluation</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="live" id="live"><span class="dot"></span><span id="live-text">connecting</span></div>
+      <div class="policy" id="policy-meta"></div>
+      <div class="credit">Built by <span>Vaibhav</span></div>
+    </div>
+  </aside>
+
+  <main>
+    <!-- Live flow -->
+    <section class="view" id="view-flow">
+      <header class="page-head">
+        <div>
+          <h1>Live flow</h1>
+          <p>Send a request and follow it step by step: from the user, through the agent and MCP Shield, to the tool server and back.</p>
+        </div>
+      </header>
+
+      <div class="scenarios" id="scenarios"></div>
+
+      <div class="card pipeline-card">
+        <div class="card-head">
+          <h2>Request path</h2>
+          <span class="run-state" id="run-state"></span>
+        </div>
+        <div class="pipeline" id="pipeline">
+          <div class="node" data-node="user"><div class="node-kicker">01</div><div class="node-name">User</div><div class="node-note">asks for something</div></div>
+          <div class="edge" data-edge="user-agent"><span class="packet"></span></div>
+          <div class="node" data-node="agent"><div class="node-kicker">02</div><div class="node-name">Agent</div><div class="node-note">LangGraph · gpt-oss-20b</div></div>
+          <div class="edge" data-edge="agent-shield"><span class="packet"></span></div>
+          <div class="shield-group" data-node="shield">
+            <div class="group-label">03 · MCP Shield proxy</div>
+            <div class="stations">
+              <div class="station" data-node="scan"><div class="node-name">Regex scan</div><div class="node-note">microseconds</div></div>
+              <div class="station" data-node="judge"><div class="node-name">LLM judge</div><div class="node-note">only if unsure</div></div>
+              <div class="station" data-node="policy"><div class="node-name">Policy</div><div class="node-note">policy.yaml</div></div>
+              <div class="station" data-node="action"><div class="node-name">Sanitize / Human</div><div class="node-note">if needed</div></div>
+            </div>
+            <div class="bypass-note">Not in the path for this run</div>
+          </div>
+          <div class="edge" data-edge="shield-server"><span class="packet"></span></div>
+          <div class="node" data-node="server"><div class="node-kicker">04</div><div class="node-name">Tool server</div><div class="node-note">MCP over stdio</div></div>
+        </div>
+      </div>
+
+      <div class="flow-grid">
+        <div class="card runs-card">
+          <div class="card-head"><h2>Runs</h2></div>
+          <ul class="runs" id="runs"></ul>
+        </div>
+        <div class="card timeline-card">
+          <div class="card-head">
+            <h2 id="timeline-title">Steps</h2>
+            <span class="muted small" id="timeline-meta"></span>
+          </div>
+          <div id="decision"></div>
+          <ol class="timeline" id="timeline"></ol>
+          <div id="outcome"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Overview -->
+    <section class="view" id="view-overview" hidden>
+      <header class="page-head">
+        <div>
+          <h1>Overview</h1>
+          <p>Every tool description, argument set and tool result the proxy has inspected.</p>
+        </div>
+      </header>
+      <div class="stats" id="stats"></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-head"><h2>By surface</h2></div><div id="surfaces"></div></div>
+        <div class="card"><div class="card-head"><h2>Latency</h2></div><div id="latency"></div></div>
+      </div>
+      <div class="card flush">
+        <div class="card-head"><h2>Recent decisions</h2><a href="#activity" class="link">Open audit log →</a></div>
+        <div id="recent"></div>
+      </div>
+    </section>
+
+    <!-- Audit log -->
+    <section class="view" id="view-activity" hidden>
+      <header class="page-head">
+        <div>
+          <h1>Audit log</h1>
+          <p>One row per decision, newest first. Stored in SQLite, updated every two seconds.</p>
+        </div>
+      </header>
+      <div class="toolbar">
+        <div class="segmented" id="action-filter">
+          <button data-action="" class="active">All</button>
+          <button data-action="BLOCK">Blocked</button>
+          <button data-action="SANITIZE">Sanitized</button>
+          <button data-action="ALLOW">Allowed</button>
+        </div>
+        <input id="tool-filter" type="search" placeholder="Filter by tool">
+      </div>
+      <div class="card flush"><div id="events"></div></div>
+    </section>
+
+    <!-- Approvals -->
+    <section class="view" id="view-approvals" hidden>
+      <header class="page-head">
+        <div>
+          <h1>Approvals</h1>
+          <p>When the judge cannot decide, or a flagged item has nothing that can be removed, the call pauses here (LangGraph <code>interrupt()</code>). No answer before the timeout means deny.</p>
+        </div>
+      </header>
+      <div id="pending"></div>
+      <div class="card flush">
+        <div class="card-head"><h2>History</h2></div>
+        <div id="approval-history"></div>
+      </div>
+    </section>
+
+    <!-- Playground -->
+    <section class="view" id="view-playground" hidden>
+      <header class="page-head">
+        <div>
+          <h1>Playground</h1>
+          <p>Run any text through the real inspection graph. Nothing is forwarded to a tool.</p>
+        </div>
+      </header>
+      <div class="grid-2 align-start">
+        <form class="card" id="inspect-form">
+          <label class="field">
+            <span>Surface</span>
+            <select id="pg-kind">
+              <option value="result">Tool result: prompt injection</option>
+              <option value="arguments">Tool arguments (JSON): data exfiltration</option>
+              <option value="description">Tool description: tool poisoning</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Content</span>
+            <textarea id="pg-content" rows="10" spellcheck="false"></textarea>
+          </label>
+          <div class="examples"><span class="muted small">Try</span><div id="examples"></div></div>
+          <div class="form-foot">
+            <button class="btn btn-primary" type="submit" id="pg-submit">Inspect</button>
+            <span class="muted small">Items that are not an obvious attack go to the LLM judge.</span>
+          </div>
+        </form>
+        <div class="card" id="pg-result"><div class="empty">The verdict, the action and the reasons appear here.</div></div>
+      </div>
+    </section>
+
+    <!-- Evaluation -->
+    <section class="view" id="view-evaluation" hidden>
+      <header class="page-head">
+        <div>
+          <h1>Evaluation</h1>
+          <p>Labelled attack and benign cases scored by <code>evals/run_eval.py</code>. The holdout cases were written after tuning and never used to tune.</p>
+        </div>
+      </header>
+      <div id="evals"></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

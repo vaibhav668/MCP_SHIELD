@@ -1,0 +1,28 @@
+# MCP Shield policy. Edit this file to change behaviour, no code changes needed.
+
+# Fast-path score bands: at or above high = block at once, below low = allow at once,
+# anything in between goes to the LLM judge.
+#   low: 0.0  -> the judge looks at everything that is not an obvious attack (measured: far better recall, ~1 s per item)
+#   low: 0.2  -> the judge only sees items the regex rules were unsure about (fast and cheap, but misses paraphrased attacks)
+low: 0.0
+high: 0.8
+
+
+# How long (seconds) the proxy waits for a human before it denies by default.
+approval_timeout: 60
+
+# Email addresses on these domains are not treated as "outside".
+trusted_domains:
+  - company.com
+
+# What to do when the graph says BLOCK, depending on what was inspected.
+#   BLOCK    = refuse (hide the tool / refuse the call / drop the result)
+#   SANITIZE = remove only the dangerous part and let the rest through
+#   ASK_HUMAN = pause and wait for a person to approve or deny
+on_block:
+  description: BLOCK
+  arguments: SANITIZE
+  result: SANITIZE
+
+# What to do when the judge could not decide (for example the API failed).
+on_unsure: ASK_HUMAN
