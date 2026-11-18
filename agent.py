@@ -15,16 +15,24 @@ SERVERS = [
 
 SYSTEM = "Your are a helpful assistant. Use the available tools to complete the user's requests."
 
+def clean_keys():
+    """Remove spaces and line breaks around the API keys. A key pasted with a trailing newline (easy to do in a
+    hosting dashboard) makes every request fail with a vague 'Connection error'."""
+    load_dotenv()
+    for name in ("GROQ_API_KEY", "GOOGLE_API_KEY"):
+        if os.getenv(name):
+            os.environ[name] = os.environ[name].strip()
+
 def make_llm():
     """Create the Groq chat model. Needs GROQ_API_KEY in .env."""
-    load_dotenv()
+    clean_keys()
     # two retries: short network failures (common on small cloud instances) should not fail the whole run
     return ChatGroq(model=os.getenv("GROQ_MODEL","openai/gpt-oss-20b"),temperature=0, max_retries=2, timeout=60)
 
 def make_fallbacks():
     """Backup agent model for when Groq is rate limited (needs GOOGLE_API_KEY). Note: a different model may resist
     the attacks better or worse than gpt-oss-20b, so attack demos are most meaningful on the primary model."""
-    load_dotenv()
+    clean_keys()
     if not os.getenv("GOOGLE_API_KEY"):
         return []
     from langchain_google_genai import ChatGoogleGenerativeAI
