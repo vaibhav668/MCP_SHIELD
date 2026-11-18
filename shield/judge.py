@@ -64,7 +64,7 @@ def make_llms():
     models = [groq]
     if os.getenv("GOOGLE_API_KEY"):  # two Gemini models: when one is overloaded (503) the other usually is not
         for name in os.getenv("JUDGE_FALLBACK_MODELS", "gemini-3.1-flash-lite,gemini-3.5-flash-lite").split(","):
-            models.append(ChatGoogleGenerativeAI(model=name.strip(), temperature=0, timeout=15, max_retries=0))
+            models.append(ChatGoogleGenerativeAI(model=name.strip(), temperature=0, timeout=20, max_retries=1))
     return models[::-1] if os.getenv("JUDGE_PROVIDER") == "gemini" else models
 
 def structured(llm):

@@ -18,7 +18,8 @@ SYSTEM = "Your are a helpful assistant. Use the available tools to complete the 
 def make_llm():
     """Create the Groq chat model. Needs GROQ_API_KEY in .env."""
     load_dotenv()
-    return ChatGroq(model=os.getenv("GROQ_MODEL","openai/gpt-oss-20b"),temperature=0, max_retries=0)
+    # two retries: short network failures (common on small cloud instances) should not fail the whole run
+    return ChatGroq(model=os.getenv("GROQ_MODEL","openai/gpt-oss-20b"),temperature=0, max_retries=2, timeout=60)
 
 def make_fallbacks():
     """Backup agent model for when Groq is rate limited (needs GOOGLE_API_KEY). Note: a different model may resist
@@ -27,7 +28,7 @@ def make_fallbacks():
     if not os.getenv("GOOGLE_API_KEY"):
         return []
     from langchain_google_genai import ChatGoogleGenerativeAI
-    return [ChatGoogleGenerativeAI(model=os.getenv("AGENT_FALLBACK_MODEL", "gemini-3.1-flash-lite"), temperature=0, max_retries=1)]
+    return [ChatGoogleGenerativeAI(model=os.getenv("AGENT_FALLBACK_MODEL", "gemini-3.1-flash-lite"), temperature=0, max_retries=2, timeout=60)]
 
 def build_graph(llm, tools, fallbacks=()):
     """Agent loop: model -> (tools ->model)* -> answer."""

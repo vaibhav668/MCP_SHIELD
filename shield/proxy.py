@@ -200,8 +200,10 @@ async def main(paths):
 
         for path in paths:
             session = await connect_upstream(stack, path)
-            for tool in (await session.list_tools()).tools:
-                action, reason, cached = await check_description(tool, path)
+            listed = (await session.list_tools()).tools
+            # check all of this server's tool descriptions at the same time instead of one after another
+            checks = await asyncio.gather(*(check_description(tool, path) for tool in listed))
+            for tool, (action, reason, cached) in zip(listed, checks):
                 log_event("tool_listed", server=path, tool=tool.name, description=tool.description, action=action)
                 note = " (cached verdict)" if cached else ""
                 if action == "BLOCK":
