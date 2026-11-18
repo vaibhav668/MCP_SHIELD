@@ -1,6 +1,8 @@
 import asyncio
+import base64
 import json
 import os
+import secrets
 import statistics
 import sys
 import time
@@ -8,11 +10,11 @@ import uuid
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-
+ 
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))  # so 'shield', 'agent', 'evals' import when run as a script
 
@@ -28,6 +30,31 @@ EVALS = ROOT / "evals"
 
 app = FastAPI(title="MCP Shield dashboard")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+# When DASHBOARD_PASSWORD is set (on a public server), the browser asks for it before showing anything.
+# Locally it is not set, so nothing changes. Any username works; only the password is checked.
+PASSWORD = os.getenv("DASHBOARD_PASSWORD")
+
+
+@app.middleware("http")
+async def require_password(request: Request, call_next):
+    if PASSWORD and request.url.path != "/healthz":
+        header = request.headers.get("authorization", "")
+        given = ""
+        if header.startswith("Basic "):
+            try:
+                given = base64.b64decode(header[6:]).decode().partition(":")[2]
+            except Exception:
+                given = ""
+        if not secrets.compare_digest(given, PASSWORD):
+            return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="MCP Shield"'})
+    return await call_next(request)
+
+
+@app.get("/healthz")
+def healthz():
+    """Used by the hosting platform to check the app is up (no password needed)."""
+    return {"ok": True}
 
 
 def median(values):

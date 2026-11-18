@@ -1,0 +1,18 @@
+# Render Blueprint: one web service that runs the dashboard, the agent, the proxy and the MCP servers.
+services:
+  - type: web
+    name: mcp-shield
+    runtime: python
+    plan: free
+    buildCommand: pip install uv && uv sync --frozen --no-dev
+    startCommand: uv run --no-dev uvicorn dashboard.server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: GROQ_API_KEY
+        sync: false        # Render asks you for the value
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: DASHBOARD_PASSWORD
+        sync: false
