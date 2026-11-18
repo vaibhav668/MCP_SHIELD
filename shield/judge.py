@@ -1,7 +1,5 @@
 import json
-import os
-import sys
-import time
+import os 
 
 from dotenv import load_dotenv
 from langchain_core.documents import Document
@@ -61,32 +59,13 @@ def make_llms():
     token cap, so Gemini (about 2 s) is the fallback. Set JUDGE_PROVIDER=gemini in .env to put Gemini first,
     and JUDGE_FALLBACK_MODELS to choose the Gemini models."""
     load_dotenv()
-    for name in ("GROQ_API_KEY", "GOOGLE_API_KEY"):  # a pasted key with a trailing newline breaks every request
-        if os.getenv(name):
-            os.environ[name] = os.environ[name].strip()
     groq = ChatGroq(model=os.getenv("GROQ_MODEL", "openai/gpt-oss-20b"), temperature=0,
                     timeout=20, max_retries=0)  # no retries: on a rate limit we want to fall back at once
     models = [groq]
     if os.getenv("GOOGLE_API_KEY"):  # two Gemini models: when one is overloaded (503) the other usually is not
         for name in os.getenv("JUDGE_FALLBACK_MODELS", "gemini-3.1-flash-lite,gemini-3.5-flash-lite").split(","):
-            # no retries here either: the next model in the list is the retry
-            models.append(ChatGoogleGenerativeAI(model=name.strip(), temperature=0, timeout=12, max_retries=0))
+            models.append(ChatGoogleGenerativeAI(model=name.strip(), temperature=0, timeout=20, max_retries=1))
     return models[::-1] if os.getenv("JUDGE_PROVIDER") == "gemini" else models
-
-
-# Models that recently said "rate limit" or "overloaded" are skipped for a few minutes,
-# so every judge call does not waste time asking a model that is known to be down.
-COOLDOWN_SECONDS = 300
-cooling_until = {}
-
-
-def model_name(llm):
-    return getattr(llm, "model_name", None) or getattr(llm, "model", None) or type(llm).__name__
-
-
-def is_capacity_error(error):
-    text = str(error).lower()
-    return any(word in text for word in ("429", "rate limit", "503", "unavailable", "overloaded", "high demand"))
 
 def structured(llm):
     """Wrap a chat model so it answers with a Verdict."""
@@ -99,18 +78,10 @@ def ask_judge(kind,content,reasons=None,llm=None):
     text= content if isinstance(content,str) else json.dumps(content)
     examples = "\n".join("- " + d.page_content for d in AttackRetriever().invoke(text)) or "- none"
     prompt = PROMPT.format(kind=kind, examples=examples, reasons=reasons or "none", content=text)
-    if llm:
-        return structured(llm).invoke(prompt)
-    models = make_llms()
-    now = time.time()
-    ready = [m for m in models if cooling_until.get(model_name(m), 0) <= now] or models  # all cooling: try anyway
     error = None
-    for model in ready:
+    for model in ([llm] if llm else make_llms()):
         try:
             return structured(model).invoke(prompt)
         except Exception as e:  # rate limit, outage or an empty reply: go on to the next model
             error = e
-            print(f"[judge] {model_name(model)} failed: {str(e)[:200]}", file=sys.stderr, flush=True)  # server log
-            if is_capacity_error(e):
-                cooling_until[model_name(model)] = time.time() + COOLDOWN_SECONDS
     raise error
